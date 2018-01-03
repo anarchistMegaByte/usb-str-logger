@@ -372,7 +372,7 @@ public class MainActivity extends AppCompatActivity {
                         i =0;
                         logText =  str;
                     } else {
-                        logText +=  str + "\n";
+                        logText +=  str + "\n" + "--------\n";
                     }
                 }
 

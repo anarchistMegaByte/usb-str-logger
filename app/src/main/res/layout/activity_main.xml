@@ -12,9 +12,14 @@
         android:orientation="vertical">
 
         <LinearLayout
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="10">
+            android:layout_weight="10"
+            android:background="@drawable/bg_custom_border_logs_screen">
             <ScrollView
                 android:id="@+id/scroll_view"
                 android:layout_width="match_parent"
@@ -23,7 +28,9 @@
                     android:id="@+id/logs_view"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:text="Manav"/>
+                    android:text="Manav"
+                    android:layout_marginLeft="10dp"
+                    android:layout_marginRight="10dp"/>
             </ScrollView>
         </LinearLayout>
 
@@ -47,7 +54,8 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:gravity="center">
+                android:gravity="center"
+                android:visibility="invisible">
                 <Button
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

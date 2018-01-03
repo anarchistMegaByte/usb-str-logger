@@ -62,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
 
     ArrayList<String> allStrings = new ArrayList<>();
     public static String prevString = "";
+    public static int numOfChars = 0;
+
 
     UsbDevice usbDevice = null;
     private static final String ACTION_USB_PERMISSION =
@@ -291,23 +293,23 @@ public class MainActivity extends AppCompatActivity {
      * Parsing the data recieved from USB
      * @param data
      */
-    public void processStringData(String data) {
+    public void processStringData(String data, char start, char end) {
         //Log.d("DATA INPUT",data);
         int flag = 0;
         String finalOne = "";
         for (char c : data.toCharArray()) {
             flag = 1;
-            if (c != '$' && c != '*') {
+            if (c != start && c != end) {
                 finalOne += c;
             }
-            if (c == '$') {
+            if (c == start) {
                 if (prevString.equals("")) {
                     finalOne = "";
                 } else {
                     finalOne = "";
                 }
             }
-            if (c == '*') {
+            if (c == end) {
                 prevString += finalOne;
                 if (updateListenerForUsb != null) {
                     updateListenerForUsb.updateUsbData(prevString);
@@ -327,15 +329,15 @@ public class MainActivity extends AppCompatActivity {
      * Parsing data as per n bytes at a time
      */
     public void parsingNBytestATime(String data){
-        int numOfBytes = 0;
         int flag = 0;
         String finalOne = "";
         for (char c : data.toCharArray()) {
-            if (numOfBytes != Constants.MAX_NUMBER_OF_BYTES) {
+            if (numOfChars != Constants.MAX_NUMBER_OF_BYTES) {
                 finalOne += c;
-                numOfBytes++;
+                numOfChars++;
             } else {
-                numOfBytes = 0;
+                finalOne += c;
+                numOfChars = 0;
                 prevString += finalOne;
                 if (updateListenerForUsb != null) {
                     updateListenerForUsb.updateUsbData(prevString);
@@ -402,7 +404,7 @@ public class MainActivity extends AppCompatActivity {
             String data = null;
             data = new String(arg0);
             if (Constants.IS_DOLLAR_STAR_CONDITION) {
-                processStringData(data);
+                processStringData(data, Constants.START_CHAR, Constants.END_CHAR);
             } else {
                 parsingNBytestATime(data);
             }

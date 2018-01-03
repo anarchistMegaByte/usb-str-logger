@@ -70,6 +70,13 @@
                     android:text="$,* Strings" />
 
                 <RadioButton
+                    android:id="@+id/rd_sqbrac_backslashn"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="[,n Strings" />
+
+                <RadioButton
                     android:id="@+id/rd_bytes"
                     android:layout_weight="1"
                     android:layout_width="0dp"

@@ -28,4 +28,7 @@ public class Constants {
 
     public static boolean IS_DOLLAR_STAR_CONDITION = false;
 
+    public static char START_CHAR = '$';
+    public static char END_CHAR = '*';
+
 }

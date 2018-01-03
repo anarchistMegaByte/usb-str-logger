@@ -29,9 +29,19 @@ public class SettingsLogger extends AppCompatActivity {
                 if (checkedId == R.id.rd_dollar_star) {
                     Constants.IS_DOLLAR_STAR_CONDITION = true;
                     MainActivity.prevString = "";
+                    MainActivity.numOfChars = 0;
+                    Constants.START_CHAR = '$';
+                    Constants.END_CHAR = '*';
                 } else if (checkedId == R.id.rd_bytes) {
                     Constants.IS_DOLLAR_STAR_CONDITION = false;
                     MainActivity.prevString = "";
+                    MainActivity.numOfChars = 0;
+                } else if (checkedId == R.id.rd_sqbrac_backslashn) {
+                    Constants.IS_DOLLAR_STAR_CONDITION = true;
+                    MainActivity.prevString = "";
+                    MainActivity.numOfChars = 0;
+                    Constants.START_CHAR = '[';
+                    Constants.END_CHAR = '\n';
                 }
             }
         });

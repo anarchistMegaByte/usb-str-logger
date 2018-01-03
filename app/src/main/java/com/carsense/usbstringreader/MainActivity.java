@@ -1,5 +1,6 @@
 package com.carsense.usbstringreader;
 
+import android.Manifest;
 import android.app.ActivityManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -7,23 +8,38 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.AsyncTask;
 import android.os.CountDownTimer;
+import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.RadioGroup;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.carsense.usbstringreader.Interfaces.UpdatesCallBack;
 import com.felhr.usbserial.UsbSerialDevice;
 import com.felhr.usbserial.UsbSerialInterface;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -32,10 +48,20 @@ import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
+    public final static int MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 101;
+
+    Button btnStartLogging;
+    Button btnEndLogging;
+
+    TextView logView;
+    String logText = "";
+    int i =0;
+    ScrollView scrollNow;
+
     private static UpdatesCallBack updateListenerForUsb = null;
 
     ArrayList<String> allStrings = new ArrayList<>();
-    String prevString = "";
+    public static String prevString = "";
 
     UsbDevice usbDevice = null;
     private static final String ACTION_USB_PERMISSION =
@@ -49,7 +75,50 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        btnStartLogging = (Button) findViewById(R.id.start_logging);
+        btnStartLogging.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                btnStartLogging.setVisibility(View.INVISIBLE);
+                btnEndLogging.setVisibility(View.VISIBLE);
+                requestPermissions();
+                String pathForFiles = createFilePath();
+                try {
+
+                    //usb data
+                    Constants.usbFile = new File(pathForFiles, Constants.DEFAULT_FILE_NAME_FOR_RAW_USB_DATA + ".txt");
+                    Constants.usbFos = new FileOutputStream(Constants.usbFile);
+                    Constants.usbOutputStreamWriter = new OutputStreamWriter(Constants.usbFos);
+
+
+                } catch (IOException io) {
+                    io.printStackTrace();
+                }
+            }
+        });
+        btnEndLogging = (Button) findViewById(R.id.end_logging);
+        btnEndLogging.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                btnStartLogging.setVisibility(View.VISIBLE);
+                btnEndLogging.setVisibility(View.INVISIBLE);
+                try {
+                    Constants.usbOutputStreamWriter.close();
+                    Constants.usbFos.close();
+                    Constants.usbFile = null;
+                } catch (Exception e) {
+
+                }
+
+            }
+        });
+
+        scrollNow = (ScrollView) findViewById(R.id.scroll_view);
+        logView = (TextView) findViewById(R.id.logs_view);
         permissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+        registerReceiver(usbPermissionReceiver, filter);
         startUSBSending();
     }
 
@@ -69,6 +138,37 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(receiver, filter);
         setUsbUpdateListener(actualUsbDataAfterParsing);
 
+    }
+
+
+    /**
+     * onCreateOptionsMenu
+     * @param menu
+     * @return
+     */
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_start_screen, menu);
+        return true;
+    }
+
+    /**
+     * onOptionsItemSelected
+     * @param item
+     * @return
+     */
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        Intent i1;
+        switch (item.getItemId()) {
+
+            case R.id.settings:
+                i1 = new Intent(this, SettingsLogger.class);
+                startActivity(i1);
+                break;
+
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     /**
@@ -224,6 +324,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * Parsing data as per n bytes at a time
+     */
+    public void parsingNBytestATime(String data){
+        int numOfBytes = 0;
+        int flag = 0;
+        String finalOne = "";
+        for (char c : data.toCharArray()) {
+            if (numOfBytes != Constants.MAX_NUMBER_OF_BYTES) {
+                finalOne += c;
+                numOfBytes++;
+            } else {
+                numOfBytes = 0;
+                prevString += finalOne;
+                if (updateListenerForUsb != null) {
+                    updateListenerForUsb.updateUsbData(prevString);
+                }
+                Log.e("Message",prevString);
+                allStrings.add(prevString);
+                prevString = "";
+                finalOne = "";
+            }
+            flag = 1;
+        }
+        if (flag == 1) {
+            prevString += finalOne;
+        }
+    }
+
+    /**
      * Callback is called when parsing and validation of streaming data is Over
      */
     private UpdatesCallBack actualUsbDataAfterParsing = new UpdatesCallBack() {
@@ -234,12 +363,31 @@ public class MainActivity extends AppCompatActivity {
                 Intent logIntent = new Intent("LOG_STRINGS");
                 logIntent.putExtra(Constants.KEY_FOR_LOG_STRINGS_INTENT, str);
                 LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(logIntent);
-                String[] commaSeparatedValues = str.split(",");
 
-                Log.e("TSG", commaSeparatedValues.toString());
-//                if (Constants.usbOutputStreamWriter != null) {
-//                    Constants.usbOutputStreamWriter.write(Calendar.getInstance().getTimeInMillis() + "," + str + "\n");
-//                }
+                // Get extra data included in the Intent
+                if (true) {
+                    if (logText.length() >= 65535) {
+                        i =0;
+                        logText =  str;
+                    } else {
+                        logText +=  str + "\n";
+                    }
+                }
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        //stuff that updates ui
+                        logView.setText(logText);
+                        scrollNow.fullScroll(ScrollView.FOCUS_DOWN);
+                    }
+                });
+
+                if (Constants.usbOutputStreamWriter != null) {
+                    Constants.usbOutputStreamWriter.write(Calendar.getInstance().getTime() + " , " + str + "\n");
+                } else {
+                    Log.e("TAFG", "Unable to write");
+                }
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -253,9 +401,12 @@ public class MainActivity extends AppCompatActivity {
         public void onReceivedData(byte[] arg0) {
             String data = null;
             data = new String(arg0);
-            processStringData(data);
-            //parseUSBLocationData(data);
-
+            if (Constants.IS_DOLLAR_STAR_CONDITION) {
+                processStringData(data);
+            } else {
+                parsingNBytestATime(data);
+            }
+            Log.e("ProcessData",data);
         }
     };
 
@@ -266,6 +417,8 @@ public class MainActivity extends AppCompatActivity {
      * Reciever is called when USB device is Connected by OTG
      */
     private BroadcastReceiver receiver = new BroadcastReceiver() {
+
+
         @Override
         public void onReceive(Context context, Intent intent) {
             //do something based on the intent's action
@@ -399,5 +552,61 @@ public class MainActivity extends AppCompatActivity {
 
         }
     };
+
+    public String createFilePath() {
+        File createRootFolder = new File(Environment.getExternalStorageDirectory(), Constants.ROOT_FOLDER_NAME);
+
+        if (!createRootFolder.exists()) {
+            createRootFolder.mkdirs();
+        }
+
+        Calendar cal = Calendar.getInstance();
+        Constants.TRIP_FOLDER_NAME = cal.get(Calendar.DATE) + "z" + (cal.get(Calendar.MONTH) + 1) + "z" + cal.get(Calendar.HOUR_OF_DAY)
+                + "z" + cal.get(Calendar.MINUTE) + "z" + cal.get(Calendar.SECOND);
+        File createTripFolder = new File(Constants.ROOT_PATH_FOR_SAVING_TRIP_FOLDERS, Constants.TRIP_FOLDER_NAME);
+
+        if (!createTripFolder.exists()) {
+            createTripFolder.mkdirs();
+        }
+
+        String PATH_FOR_SAVING_FILES = Constants.ROOT_PATH_FOR_SAVING_TRIP_FOLDERS + File.separator
+                + Constants.TRIP_FOLDER_NAME;
+        return PATH_FOR_SAVING_FILES;
+    }
+
+    public void requestPermissions() {
+        // Assume thisActivity is the current activity
+        int permissionCheck = ContextCompat.checkSelfPermission(this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+        if (permissionCheck == PackageManager.PERMISSION_DENIED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
+
+        }
+
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+
+                } else {
+                    Toast.makeText(this, "App May not work properly. Restart the app to grant permission.", Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
+    }
 
 }
